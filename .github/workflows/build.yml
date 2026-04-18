@@ -15,39 +15,42 @@ jobs:
       - name: Patch Dockerfile to add custom nodes
         run: |
           python3 << 'PYEOF'
+          import sys
+
           with open('Dockerfile', 'r') as f:
               content = f.read()
 
-          custom_nodes = """
-# Install custom nodes for LTX-Video pipeline
-RUN cd /comfyui/custom_nodes && \\
-    git clone https://github.com/Lightricks/ComfyUI-LTXVideo --depth 1 && \\
-    git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite --depth 1 && \\
-    git clone https://github.com/sipherxyz/comfyui-art-venture --depth 1 && \\
-    pip install -r ComfyUI-LTXVideo/requirements.txt
+          lines = [
+              '',
+              '# Install custom nodes for LTX-Video pipeline',
+              'RUN cd /comfyui/custom_nodes && \\',
+              '    git clone https://github.com/Lightricks/ComfyUI-LTXVideo --depth 1 && \\',
+              '    git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite --depth 1 && \\',
+              '    git clone https://github.com/sipherxyz/comfyui-art-venture --depth 1 && \\',
+              '    pip install -r ComfyUI-LTXVideo/requirements.txt',
+              '',
+          ]
+          custom_nodes = '\n'.join(lines) + '\n'
 
-"""
-
-          if 'CMD ["/start.sh"]' in content:
-              content = content.replace('CMD ["/start.sh"]', custom_nodes + 'CMD ["/start.sh"]')
+          target = 'CMD ["/start.sh"]'
+          if target in content:
+              content = content.replace(target, custom_nodes + target)
               print("SUCCESS: Dockerfile patched")
           else:
               print("ERROR: CMD line not found in Dockerfile")
-              print("Dockerfile content around CMD:")
               for i, line in enumerate(content.split('\n')):
                   if 'CMD' in line or 'start.sh' in line:
                       print(f"  Line {i}: {repr(line)}")
-              exit(1)
+              sys.exit(1)
 
           with open('Dockerfile', 'w') as f:
               f.write(content)
 
-          # Verify
           if 'ComfyUI-LTXVideo' in content:
               print("VERIFIED: Custom nodes in Dockerfile")
           else:
               print("ERROR: Patch verification failed")
-              exit(1)
+              sys.exit(1)
           PYEOF
 
       - name: Show patched Dockerfile section
