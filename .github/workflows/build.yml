@@ -12,9 +12,46 @@ jobs:
       - name: Clone worker-comfyui
         run: git clone https://github.com/runpod-workers/worker-comfyui --depth 1 .
 
-      - name: Add custom nodes to Dockerfile
+      - name: Patch Dockerfile to add custom nodes
         run: |
-          sed -i 's|CMD \["/start.sh"\]|RUN cd /comfyui/custom_nodes \&\& git clone https://github.com/Lightricks/ComfyUI-LTXVideo --depth 1 \&\& git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite --depth 1 \&\& git clone https://github.com/sipherxyz/comfyui-art-venture --depth 1 \&\& pip install -r ComfyUI-LTXVideo/requirements.txt\n\nCMD [\"/start.sh\"]|' Dockerfile
+          python3 << 'PYEOF'
+          with open('Dockerfile', 'r') as f:
+              content = f.read()
+
+          custom_nodes = """
+# Install custom nodes for LTX-Video pipeline
+RUN cd /comfyui/custom_nodes && \\
+    git clone https://github.com/Lightricks/ComfyUI-LTXVideo --depth 1 && \\
+    git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite --depth 1 && \\
+    git clone https://github.com/sipherxyz/comfyui-art-venture --depth 1 && \\
+    pip install -r ComfyUI-LTXVideo/requirements.txt
+
+"""
+
+          if 'CMD ["/start.sh"]' in content:
+              content = content.replace('CMD ["/start.sh"]', custom_nodes + 'CMD ["/start.sh"]')
+              print("SUCCESS: Dockerfile patched")
+          else:
+              print("ERROR: CMD line not found in Dockerfile")
+              print("Dockerfile content around CMD:")
+              for i, line in enumerate(content.split('\n')):
+                  if 'CMD' in line or 'start.sh' in line:
+                      print(f"  Line {i}: {repr(line)}")
+              exit(1)
+
+          with open('Dockerfile', 'w') as f:
+              f.write(content)
+
+          # Verify
+          if 'ComfyUI-LTXVideo' in content:
+              print("VERIFIED: Custom nodes in Dockerfile")
+          else:
+              print("ERROR: Patch verification failed")
+              exit(1)
+          PYEOF
+
+      - name: Show patched Dockerfile section
+        run: grep -A 8 "Install custom nodes" Dockerfile
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
